@@ -29,6 +29,7 @@ import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
 import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
 import type {
+  ApiErrorResponse,
   ConnectionStatusResponse,
   QueryResponse,
   SchemaItem,
@@ -55,6 +56,9 @@ export function ExplorerApp() {
   const [tableFilter, setTableFilter] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [explorerError, setExplorerError] = useState<string | null>(null);
+  const [tableError, setTableError] = useState<string | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
 
   useEffect(() => {
     void loadConnection();
@@ -83,25 +87,50 @@ export function ExplorerApp() {
 
   async function loadConnection() {
     setLoadingConnection(true);
-    const [connectionResponse, schemasResponse] = await Promise.all([
-      fetch("/api/connection").then((res) => res.json() as Promise<ConnectionStatusResponse>),
-      fetch("/api/schemas").then((res) => res.json() as Promise<SchemaItem[]>),
-    ]);
+    setExplorerError(null);
+    try {
+      const [connectionResponse, schemasResponse] = await Promise.all([
+        fetchJson<ConnectionStatusResponse>("/api/connection"),
+        fetchJson<SchemaItem[]>("/api/schemas"),
+      ]);
 
-    setConnection(connectionResponse);
-    setSchemas(schemasResponse);
-    const firstSchema = schemasResponse[0]?.name ?? null;
-    setSelectedSchema(firstSchema);
-    setLoadingConnection(false);
+      setConnection(connectionResponse);
+      setSchemas(schemasResponse);
+      const firstSchema = schemasResponse[0]?.name ?? null;
+      setSelectedSchema(firstSchema);
+    } catch (error) {
+      const message = getUiErrorMessage(error);
+      setExplorerError(message);
+      setConnection({
+        ok: false,
+        connected: false,
+        via: "server",
+        error: message,
+      });
+      setSchemas([]);
+      setTables([]);
+      setSelectedSchema(null);
+      setSelectedTable(null);
+    } finally {
+      setLoadingConnection(false);
+    }
   }
 
   async function loadTables(schema: string) {
-    const response = await fetch(`/api/tables?schema=${encodeURIComponent(schema)}`);
-    const items = (await response.json()) as TableItem[];
-    setTables(items);
-    const firstTable = items[0]?.name ?? null;
-    setSelectedTable(firstTable);
-    setPage(0);
+    setExplorerError(null);
+    try {
+      const items = await fetchJson<TableItem[]>(
+        `/api/tables?schema=${encodeURIComponent(schema)}`,
+      );
+      setTables(items);
+      const firstTable = items[0]?.name ?? null;
+      setSelectedTable(firstTable);
+      setPage(0);
+    } catch (error) {
+      setExplorerError(getUiErrorMessage(error));
+      setTables([]);
+      setSelectedTable(null);
+    }
   }
 
   async function loadTable(
@@ -112,6 +141,7 @@ export function ExplorerApp() {
     filter: string,
   ) {
     setLoadingTable(true);
+    setTableError(null);
     const searchParams = new URLSearchParams({
       schema,
       table,
@@ -122,28 +152,42 @@ export function ExplorerApp() {
       searchParams.set("filter", filter.trim());
     }
 
-    const response = await fetch(`/api/table?${searchParams.toString()}`);
-    const payload = (await response.json()) as TableDataResponse;
-    setTableData(payload);
-    setLoadingTable(false);
+    try {
+      const payload = await fetchJson<TableDataResponse>(
+        `/api/table?${searchParams.toString()}`,
+      );
+      setTableData(payload);
+    } catch (error) {
+      setTableData(null);
+      setTableError(getUiErrorMessage(error));
+    } finally {
+      setLoadingTable(false);
+    }
   }
 
   async function runQuery() {
     setQueryRunning(true);
-    const response = await fetch("/api/query", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        sql: queryText,
-        allowWrite,
-      }),
-    });
-    const payload = (await response.json()) as QueryResponse;
-    setQueryResult(payload);
-    setTab("query");
-    setQueryRunning(false);
+    setQueryError(null);
+    try {
+      const payload = await fetchJson<QueryResponse>("/api/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sql: queryText,
+          allowWrite,
+        }),
+      });
+      setQueryResult(payload);
+      setTab("query");
+    } catch (error) {
+      setQueryResult(null);
+      setQueryError(getUiErrorMessage(error));
+      setTab("query");
+    } finally {
+      setQueryRunning(false);
+    }
   }
 
   return (
@@ -190,6 +234,9 @@ export function ExplorerApp() {
             )}
           </Stack>
           {connection?.error ? <Alert sx={{ mt: 2 }} severity="error">{connection.error}</Alert> : null}
+          {explorerError && explorerError !== connection?.error ? (
+            <Alert sx={{ mt: 2 }} severity="error">{explorerError}</Alert>
+          ) : null}
         </Paper>
 
         <Box
@@ -211,6 +258,7 @@ export function ExplorerApp() {
                 <Typography variant="subtitle2" gutterBottom>
                   Schemas
                 </Typography>
+                {explorerError ? <Alert sx={{ mb: 1 }} severity="error">{explorerError}</Alert> : null}
                 <Stack spacing={1}>
                   {schemas && schemas.map((schema) => (
                     <Button
@@ -301,6 +349,8 @@ export function ExplorerApp() {
                       size="small"
                     />
                   </Stack>
+
+                  {tableError ? <Alert severity="error">{tableError}</Alert> : null}
 
                   {loadingTable ? (
                     <Stack direction="row" spacing={1} alignItems="center">
@@ -413,6 +463,7 @@ export function ExplorerApp() {
                     </Button>
                   </Stack>
 
+                  {queryError ? <Alert severity="error">{queryError}</Alert> : null}
                   {queryResult?.error ? <Alert severity="error">{queryResult.error}</Alert> : null}
 
                   {queryResult ? (
@@ -474,4 +525,35 @@ function formatCellValue(value: unknown): string {
     return JSON.stringify(value);
   }
   return String(value);
+}
+
+async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  const response = await fetch(input, init);
+  const payload = (await response.json()) as T | ApiErrorResponse;
+
+  if (!response.ok) {
+    if (isApiErrorResponse(payload)) {
+      throw new Error(payload.error || `Request failed at stage: ${payload.stage}`);
+    }
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+
+  return payload as T;
+}
+
+function isApiErrorResponse(payload: unknown): payload is ApiErrorResponse {
+  return Boolean(
+    payload &&
+      typeof payload === "object" &&
+      "ok" in payload &&
+      "error" in payload &&
+      "stage" in payload,
+  );
+}
+
+function getUiErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Something went wrong while loading data.";
 }
