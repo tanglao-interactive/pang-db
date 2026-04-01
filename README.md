@@ -1,0 +1,50 @@
+# Pang DB
+
+Pang DB is a simple PostgreSQL explorer for local use with `npx ampx sandbox`. It combines a Next.js App Router client, a Material UI admin surface, and an Amplify Gen 2 Lambda that can be attached to an existing VPC for RDS access.
+
+## Features
+
+- connection health and database identity
+- schema and table explorer
+- paginated row browser with simple text filtering
+- SQL runner with read-only mode enabled by default
+- `DATABASE_URL` or `DATABASE_SECRET_ARN` configuration
+- Amplify Gen 2 function for sandbox-side VPC access
+
+## Local setup
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Copy `.env.example` to `.env` and fill in your AWS and database values.
+
+3. Start the Amplify sandbox in one terminal:
+
+```bash
+npm run sandbox
+```
+
+4. Start Next.js in another terminal:
+
+```bash
+npm run dev
+```
+
+## Environment contract
+
+- `AWS_REGION`
+- `AMPLIFY_VPC_ID`
+- `AMPLIFY_SUBNET_IDS`
+- `AMPLIFY_SECURITY_GROUP_IDS`
+- `DATABASE_URL` or `DATABASE_SECRET_ARN`
+- `DATABASE_SSL_MODE` (`disable`, `require`, or `no-verify`)
+- optional `AMPLIFY_DB_EXPLORER_FUNCTION_NAME`
+
+## Notes
+
+- The Next.js API layer will invoke the Amplify Lambda when `AMPLIFY_DB_EXPLORER_FUNCTION_NAME` is available.
+- If the function name is not available yet, the server falls back to the same shared Knex service locally so the UI can still be exercised during development.
+- Authentication is intentionally out of scope for this first version.
