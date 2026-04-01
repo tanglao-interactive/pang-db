@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handleTableRequest } from "@/lib/api-handlers";
+import { handleTableRequest, toApiErrorResponse } from "@/lib/api-handlers";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -13,14 +13,19 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const result = await handleTableRequest({
-    schema,
-    table,
-    page: Number(searchParams.get("page") ?? "0"),
-    pageSize: Number(searchParams.get("pageSize") ?? "25"),
-    sort: searchParams.get("sort") ?? undefined,
-    filter: searchParams.get("filter") ?? undefined,
-  });
+  try {
+    const result = await handleTableRequest({
+      schema,
+      table,
+      page: Number(searchParams.get("page") ?? "0"),
+      pageSize: Number(searchParams.get("pageSize") ?? "25"),
+      sort: searchParams.get("sort") ?? undefined,
+      filter: searchParams.get("filter") ?? undefined,
+    });
 
-  return NextResponse.json(result);
+    return NextResponse.json(result);
+  } catch (error) {
+    const payload = toApiErrorResponse(error);
+    return NextResponse.json(payload, { status: 500 });
+  }
 }

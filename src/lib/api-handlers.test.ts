@@ -1,4 +1,4 @@
-import { handleQueryRequest } from "@/lib/api-handlers";
+import { handleQueryRequest, toApiErrorResponse } from "@/lib/api-handlers";
 import * as executor from "@/lib/lambda-executor";
 
 describe("api handlers", () => {
@@ -26,5 +26,11 @@ describe("api handlers", () => {
       },
     });
     expect(response.rowCount).toBe(1);
+  });
+
+  it("serializes thrown errors into API error payloads", () => {
+    const response = toApiErrorResponse(new Error("password authentication failed"));
+    expect(response.stage).toBe("auth");
+    expect(response.error).toContain("password authentication failed");
   });
 });

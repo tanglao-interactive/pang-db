@@ -212,7 +212,7 @@ export function ExplorerApp() {
                   Schemas
                 </Typography>
                 <Stack spacing={1}>
-                  {schemas.map((schema) => (
+                  {schemas && schemas.map((schema) => (
                     <Button
                       key={schema.name}
                       variant={selectedSchema === schema.name ? "contained" : "text"}

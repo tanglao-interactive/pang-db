@@ -14,6 +14,7 @@ import type {
   TableItem,
 } from "@/lib/contracts";
 import { assertQueryAllowed } from "@/lib/sql-guard";
+import { normalizeExplorerError } from "@/lib/explorer-error";
 
 export interface ExplorerService {
   getConnectionStatus(): Promise<ConnectionStatusResponse>;
@@ -51,97 +52,111 @@ export function createExplorerService(dbFactory: () => Promise<Knex> = getDb): E
           configSource: source,
         };
       } catch (error) {
+        const normalized = normalizeExplorerError(error, "query");
         return {
           ok: false,
           connected: false,
           via: "server",
-          error: getErrorMessage(error),
+          error: normalized.message,
+          stage: normalized.stage,
+          details: normalized.details,
         };
       }
     },
 
     async listSchemas() {
-      const db = await dbFactory();
-      const result = await db.raw<{ rows: Array<{ name: string }> }>(
-        `
-          select schema_name as name
-          from information_schema.schemata
-          where schema_name not in ('information_schema', 'pg_catalog', 'pg_toast')
-            and schema_name not like 'pg_temp_%'
-            and schema_name not like 'pg_toast_temp_%'
-          order by schema_name
-        `,
-      );
-      return result.rows;
+      try {
+        const db = await dbFactory();
+        const result = await db.raw<{ rows: Array<{ name: string }> }>(
+          `
+            select schema_name as name
+            from information_schema.schemata
+            where schema_name not in ('information_schema', 'pg_catalog', 'pg_toast')
+              and schema_name not like 'pg_temp_%'
+              and schema_name not like 'pg_toast_temp_%'
+            order by schema_name
+          `,
+        );
+        return result.rows;
+      } catch (error) {
+        throw normalizeExplorerError(error, "query");
+      }
     },
 
     async listTables(schema) {
-      const db = await dbFactory();
-      const result = await db.raw<{
-        rows: Array<{ schema: string; name: string; type: "table" | "view" }>;
-      }>(
-        `
-          select table_schema as schema,
-                 table_name as name,
-                 case
-                   when table_type = 'VIEW' then 'view'
-                   else 'table'
-                 end as type
-          from information_schema.tables
-          where table_schema = ?
-            and table_type in ('BASE TABLE', 'VIEW')
-          order by table_name
-        `,
-        [schema],
-      );
+      try {
+        const db = await dbFactory();
+        const result = await db.raw<{
+          rows: Array<{ schema: string; name: string; type: "table" | "view" }>;
+        }>(
+          `
+            select table_schema as schema,
+                   table_name as name,
+                   case
+                     when table_type = 'VIEW' then 'view'
+                     else 'table'
+                   end as type
+            from information_schema.tables
+            where table_schema = ?
+              and table_type in ('BASE TABLE', 'VIEW')
+            order by table_name
+          `,
+          [schema],
+        );
 
-      return result.rows;
+        return result.rows;
+      } catch (error) {
+        throw normalizeExplorerError(error, "query");
+      }
     },
 
     async getTableData(input) {
-      const db = await dbFactory();
-      const pageSize = clamp(input.pageSize ?? 25, 10, 200);
-      const page = Math.max(input.page ?? 0, 0);
-      const columns = await getColumns(db, input.schema, input.table);
-      const sort = resolveSort(input.sort, columns);
-      const filter = input.filter?.trim();
-      const quotedSchema = quoteIdent(input.schema);
-      const quotedTable = quoteIdent(input.table);
-      const fromClause = `${quotedSchema}.${quotedTable}`;
-      const whereClause = buildFilterWhere(filter, columns);
-      const filterBindings = buildFilterBindings(filter, columns);
-      const orderClause = sort
-        ? ` order by ${quoteIdent(sort.column)} ${sort.direction}`
-        : "";
+      try {
+        const db = await dbFactory();
+        const pageSize = clamp(input.pageSize ?? 25, 10, 200);
+        const page = Math.max(input.page ?? 0, 0);
+        const columns = await getColumns(db, input.schema, input.table);
+        const sort = resolveSort(input.sort, columns);
+        const filter = input.filter?.trim();
+        const quotedSchema = quoteIdent(input.schema);
+        const quotedTable = quoteIdent(input.table);
+        const fromClause = `${quotedSchema}.${quotedTable}`;
+        const whereClause = buildFilterWhere(filter, columns);
+        const filterBindings = buildFilterBindings(filter, columns);
+        const orderClause = sort
+          ? ` order by ${quoteIdent(sort.column)} ${sort.direction}`
+          : "";
 
-      const countResult = await db.raw<{ rows: Array<{ count: string }> }>(
-        `select count(*)::text as count from ${fromClause}${whereClause}`,
-        filterBindings,
-      );
+        const countResult = await db.raw<{ rows: Array<{ count: string }> }>(
+          `select count(*)::text as count from ${fromClause}${whereClause}`,
+          filterBindings,
+        );
 
-      const rowResult = await db.raw<{ rows: Record<string, unknown>[] }>(
-        `select * from ${fromClause}${whereClause}${orderClause} limit ? offset ?`,
-        [...filterBindings, pageSize, page * pageSize],
-      );
+        const rowResult = await db.raw<{ rows: Record<string, unknown>[] }>(
+          `select * from ${fromClause}${whereClause}${orderClause} limit ? offset ?`,
+          [...filterBindings, pageSize, page * pageSize],
+        );
 
-      return {
-        schema: input.schema,
-        table: input.table,
-        totalRows: Number(countResult.rows[0]?.count ?? 0),
-        page,
-        pageSize,
-        sort,
-        columns,
-        rows: rowResult.rows,
-      };
+        return {
+          schema: input.schema,
+          table: input.table,
+          totalRows: Number(countResult.rows[0]?.count ?? 0),
+          page,
+          pageSize,
+          sort,
+          columns,
+          rows: rowResult.rows,
+        };
+      } catch (error) {
+        throw normalizeExplorerError(error, "query");
+      }
     },
 
     async runQuery(input) {
-      assertQueryAllowed(input.sql, input.allowWrite);
-      const db = await dbFactory();
-      const startedAt = Date.now();
-
       try {
+        assertQueryAllowed(input.sql, input.allowWrite);
+        const db = await dbFactory();
+        const startedAt = Date.now();
         const result = await db.raw<{
           rows?: Record<string, unknown>[];
           rowCount?: number;
@@ -155,13 +170,16 @@ export function createExplorerService(dbFactory: () => Promise<Knex> = getDb): E
           notices: [],
         };
       } catch (error) {
+        const normalized = normalizeExplorerError(error, "query");
         return {
           columns: [],
           rows: [],
           rowCount: 0,
-          durationMs: Date.now() - startedAt,
+          durationMs: 0,
           notices: [],
-          error: getErrorMessage(error),
+          error: normalized.message,
+          stage: normalized.stage,
+          details: normalized.details,
         };
       }
     },
@@ -265,11 +283,4 @@ function quoteIdent(identifier: string): string {
     throw new Error(`Unsafe identifier: ${identifier}`);
   }
   return `"${identifier.replace(/"/g, "\"\"")}"`;
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "Unknown error";
 }

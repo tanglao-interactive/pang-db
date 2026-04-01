@@ -1,4 +1,5 @@
 import type {
+  ApiErrorResponse,
   ConnectionStatusResponse,
   QueryRequest,
   QueryResponse,
@@ -8,6 +9,7 @@ import type {
   TableItem,
 } from "@/lib/contracts";
 import { dispatchExplorerAction } from "@/lib/lambda-executor";
+import { normalizeExplorerError } from "@/lib/explorer-error";
 
 export async function handleConnectionRequest(): Promise<ConnectionStatusResponse> {
   return (await dispatchExplorerAction({ type: "connection" })) as ConnectionStatusResponse;
@@ -27,4 +29,14 @@ export async function handleTableRequest(input: TableDataRequest): Promise<Table
 
 export async function handleQueryRequest(input: QueryRequest): Promise<QueryResponse> {
   return (await dispatchExplorerAction({ type: "query", input })) as QueryResponse;
+}
+
+export function toApiErrorResponse(error: unknown): ApiErrorResponse {
+  const normalized = normalizeExplorerError(error, "query");
+  return {
+    ok: false,
+    error: normalized.message,
+    stage: normalized.stage,
+    details: normalized.details,
+  };
 }

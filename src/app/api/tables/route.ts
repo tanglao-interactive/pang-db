@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handleTablesRequest } from "@/lib/api-handlers";
+import { handleTablesRequest, toApiErrorResponse } from "@/lib/api-handlers";
 
 export async function GET(request: NextRequest) {
   const schema = request.nextUrl.searchParams.get("schema");
@@ -7,6 +7,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "schema is required" }, { status: 400 });
   }
 
-  const result = await handleTablesRequest(schema);
-  return NextResponse.json(result);
+  try {
+    const result = await handleTablesRequest(schema);
+    return NextResponse.json(result);
+  } catch (error) {
+    const payload = toApiErrorResponse(error);
+    return NextResponse.json(payload, { status: 500 });
+  }
 }

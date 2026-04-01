@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ExplorerError } from "@/lib/explorer-error";
 
 const envSchema = z
   .object({
@@ -38,28 +39,38 @@ export interface ExplorerEnv {
 export function readExplorerEnv(
   source: Record<string, string | undefined> = process.env,
 ): ExplorerEnv {
-  const parsed = envSchema.parse(source);
+  const parsed = envSchema.safeParse(source);
+  if (!parsed.success) {
+    throw new ExplorerError(parsed.error.issues[0]?.message ?? "Invalid environment.", {
+      stage: "env",
+      details: JSON.stringify(parsed.error.issues),
+      statusCode: 500,
+    });
+  }
+  const value = parsed.data;
   return {
-    awsRegion: parsed.AWS_REGION,
-    databaseUrl: parsed.DATABASE_URL,
-    databaseSecretArn: parsed.DATABASE_SECRET_ARN,
-    databaseSslMode: parsed.DATABASE_SSL_MODE ?? "require",
-    amplifyDbExplorerFunctionName: parsed.AMPLIFY_DB_EXPLORER_FUNCTION_NAME,
-    vpcId: parsed.AMPLIFY_VPC_ID,
-    subnetIds: splitCsv(parsed.AMPLIFY_SUBNET_IDS),
-    securityGroupIds: splitCsv(parsed.AMPLIFY_SECURITY_GROUP_IDS),
+    awsRegion: value.AWS_REGION,
+    databaseUrl: value.DATABASE_URL,
+    databaseSecretArn: value.DATABASE_SECRET_ARN,
+    databaseSslMode: value.DATABASE_SSL_MODE ?? "require",
+    amplifyDbExplorerFunctionName: value.AMPLIFY_DB_EXPLORER_FUNCTION_NAME,
+    vpcId: value.AMPLIFY_VPC_ID,
+    subnetIds: splitCsv(value.AMPLIFY_SUBNET_IDS),
+    securityGroupIds: splitCsv(value.AMPLIFY_SECURITY_GROUP_IDS),
   };
 }
 
 export function tryReadExplorerEnv(
   source: Record<string, string | undefined> = process.env,
 ): { ok: true; value: ExplorerEnv } | { ok: false; error: string } {
-  const parsed = envSchema.safeParse(source);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid environment." };
+  try {
+    return { ok: true, value: readExplorerEnv(source) };
+  } catch (error) {
+    if (error instanceof ExplorerError) {
+      return { ok: false, error: error.message };
+    }
+    return { ok: false, error: "Invalid environment." };
   }
-
-  return { ok: true, value: readExplorerEnv(source) };
 }
 
 function splitCsv(value?: string): string[] {

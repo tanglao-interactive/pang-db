@@ -24,6 +24,7 @@
     "@emotion/styled": "11.14.1",
     "@mui/icons-material": "7.3.9",
     "@mui/material": "7.3.9",
+    "dotenv": "^16.6.1",
     "knex": "3.2.8",
     "next": "15.5.14",
     "pg": "8.20.0",

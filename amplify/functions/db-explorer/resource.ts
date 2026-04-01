@@ -1,10 +1,15 @@
 import path from "path";
+import { fileURLToPath } from "url";
 import { defineFunction } from "@aws-amplify/backend";
-import { Duration } from "aws-cdk-lib";
+import { Duration, Fn } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import type { Construct } from "constructs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function splitCsv(value?: string): string[] {
   return value
@@ -18,7 +23,14 @@ export const dbExplorer = defineFunction((scope: Construct) => {
   const subnetIds = splitCsv(process.env.AMPLIFY_SUBNET_IDS);
   const securityGroupIds = splitCsv(process.env.AMPLIFY_SECURITY_GROUP_IDS);
 
-  const vpc = vpcId ? ec2.Vpc.fromLookup(scope, "ExplorerVpc", { vpcId }) : undefined;
+  const vpc =
+    vpcId && subnetIds.length > 0
+      ? ec2.Vpc.fromVpcAttributes(scope, "ExplorerVpc", {
+          vpcId,
+          availabilityZones: Fn.getAzs(),
+          privateSubnetIds: subnetIds,
+        })
+      : undefined;
   const subnets =
     vpc && subnetIds.length > 0
       ? subnetIds.map((subnetId, index) =>
@@ -36,14 +48,13 @@ export const dbExplorer = defineFunction((scope: Construct) => {
         )
       : undefined;
 
-  return new NodejsFunction(scope, "DbExplorerFunction", {
+  const fn = new NodejsFunction(scope, "DbExplorerFunction", {
     runtime: lambda.Runtime.NODEJS_20_X,
     entry: path.join(__dirname, "handler.ts"),
     handler: "handler",
     timeout: Duration.seconds(30),
     memorySize: 1024,
     environment: {
-      AWS_REGION: process.env.AWS_REGION ?? "",
       DATABASE_URL: process.env.DATABASE_URL ?? "",
       DATABASE_SECRET_ARN: process.env.DATABASE_SECRET_ARN ?? "",
       DATABASE_SSL_MODE: process.env.DATABASE_SSL_MODE ?? "require",
@@ -55,7 +66,26 @@ export const dbExplorer = defineFunction((scope: Construct) => {
     vpcSubnets: subnets ? { subnets } : undefined,
     securityGroups,
     bundling: {
-      externalModules: ["aws-sdk"],
+      externalModules: [
+        "aws-sdk",
+        "better-sqlite3",
+        "sqlite3",
+        "mysql",
+        "mysql2",
+        "oracledb",
+        "tedious",
+      ],
     },
   });
+
+  if (process.env.DATABASE_SECRET_ARN) {
+    const secret = secretsmanager.Secret.fromSecretCompleteArn(
+      scope,
+      "ExplorerDatabaseSecret",
+      process.env.DATABASE_SECRET_ARN,
+    );
+    secret.grantRead(fn);
+  }
+
+  return fn;
 });

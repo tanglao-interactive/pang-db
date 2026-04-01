@@ -43,8 +43,19 @@ npm run dev
 - `DATABASE_SSL_MODE` (`disable`, `require`, or `no-verify`)
 - optional `AMPLIFY_DB_EXPLORER_FUNCTION_NAME`
 
+## Secret formats
+
+`DATABASE_SECRET_ARN` can point to a Secrets Manager secret containing any of these:
+
+- plain text `postgres://...` connection string
+- JSON with `url`, `uri`, `connectionString`, or `DATABASE_URL`
+- JSON with `host`, `port`, `username`, `password`, and `dbname` or `database`
+
+The sandbox Lambda now requires IAM permission to read that secret and a network path to Secrets Manager if it runs in private subnets.
+
 ## Notes
 
 - The Next.js API layer will invoke the Amplify Lambda when `AMPLIFY_DB_EXPLORER_FUNCTION_NAME` is available.
 - If the function name is not available yet, the server falls back to the same shared Knex service locally so the UI can still be exercised during development.
+- Lambda mode should return structured failures with a `stage` of `env`, `secret`, `network`, `ssl`, `auth`, or `query` instead of hanging until the full sandbox timeout when possible.
 - Authentication is intentionally out of scope for this first version.

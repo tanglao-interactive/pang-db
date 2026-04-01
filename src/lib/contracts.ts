@@ -1,4 +1,12 @@
 export type SortDirection = "asc" | "desc";
+export type DiagnosticStage = "env" | "secret" | "network" | "ssl" | "auth" | "query";
+
+export interface ApiErrorResponse {
+  ok: false;
+  error: string;
+  stage: DiagnosticStage;
+  details?: string;
+}
 
 export interface ConnectionStatusResponse {
   ok: boolean;
@@ -10,6 +18,8 @@ export interface ConnectionStatusResponse {
   version?: string;
   configSource?: "url" | "secret";
   error?: string;
+  stage?: DiagnosticStage;
+  details?: string;
 }
 
 export interface SchemaItem {
@@ -66,6 +76,8 @@ export interface QueryResponse {
   notices: string[];
   rejected?: boolean;
   error?: string;
+  stage?: DiagnosticStage;
+  details?: string;
 }
 
 export type ExplorerAction =
@@ -80,4 +92,5 @@ export type ExplorerResult =
   | SchemaItem[]
   | TableItem[]
   | TableDataResponse
-  | QueryResponse;
+  | QueryResponse
+  | ApiErrorResponse;
