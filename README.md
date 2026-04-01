@@ -40,7 +40,9 @@ npm run dev
 - `AMPLIFY_SUBNET_IDS`
 - `AMPLIFY_SECURITY_GROUP_IDS`
 - `DATABASE_URL` or `DATABASE_SECRET_ARN`
-- `DATABASE_SSL_MODE` (`disable`, `require`, or `no-verify`)
+- `DATABASE_SSL_MODE` (`disable`, `require`, `verify-full`, or `no-verify`)
+- optional `DATABASE_SSL_CA_FILE`
+- optional `DATABASE_SSL_CA_PEM`
 - optional `AMPLIFY_DB_EXPLORER_FUNCTION_NAME`
 
 ## Secret formats
@@ -52,6 +54,23 @@ npm run dev
 - JSON with `host`, `port`, `username`, `password`, and `dbname` or `database`
 
 The sandbox Lambda now requires IAM permission to read that secret and a network path to Secrets Manager if it runs in private subnets.
+
+## SSL verification
+
+This project now supports full RDS CA bundle verification for both local Next.js and the sandbox Lambda.
+
+- The default CA bundle path is `certs/rds/global-bundle.pem`
+- The sandbox Lambda bundle copies that file into `/var/task/certs/rds/global-bundle.pem`
+- You can override the path with `DATABASE_SSL_CA_FILE`
+- You can inline the PEM with `DATABASE_SSL_CA_PEM`
+
+Example:
+
+```bash
+DATABASE_SSL_MODE=verify-full
+DATABASE_SSL_CA_FILE=certs/rds/global-bundle.pem
+DATABASE_URL=postgres://user:password@host:5432/db?sslmode=verify-full&sslrootcert=certs/rds/global-bundle.pem
+```
 
 ## Notes
 

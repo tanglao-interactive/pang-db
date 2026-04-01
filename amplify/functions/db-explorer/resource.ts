@@ -58,6 +58,8 @@ export const dbExplorer = defineFunction((scope: Construct) => {
       DATABASE_URL: process.env.DATABASE_URL ?? "",
       DATABASE_SECRET_ARN: process.env.DATABASE_SECRET_ARN ?? "",
       DATABASE_SSL_MODE: process.env.DATABASE_SSL_MODE ?? "require",
+      DATABASE_SSL_CA_FILE: process.env.DATABASE_SSL_CA_FILE ?? "certs/rds/global-bundle.pem",
+      DATABASE_SSL_CA_PEM: process.env.DATABASE_SSL_CA_PEM ?? "",
       AMPLIFY_VPC_ID: process.env.AMPLIFY_VPC_ID ?? "",
       AMPLIFY_SUBNET_IDS: process.env.AMPLIFY_SUBNET_IDS ?? "",
       AMPLIFY_SECURITY_GROUP_IDS: process.env.AMPLIFY_SECURITY_GROUP_IDS ?? "",
@@ -75,6 +77,20 @@ export const dbExplorer = defineFunction((scope: Construct) => {
         "oracledb",
         "tedious",
       ],
+      commandHooks: {
+        beforeBundling(inputDir, outputDir) {
+          return [
+            `mkdir -p ${outputDir}/certs/rds`,
+            `cp ${inputDir}/certs/rds/global-bundle.pem ${outputDir}/certs/rds/global-bundle.pem`,
+          ];
+        },
+        beforeInstall() {
+          return [];
+        },
+        afterBundling() {
+          return [];
+        },
+      },
     },
   });
 
