@@ -2,6 +2,12 @@
 
 Pang DB is a simple PostgreSQL explorer for local use with `npx ampx sandbox`. It combines a Next.js App Router client, a Material UI admin surface, and an Amplify Gen 2 Lambda that can be attached to an existing VPC for RDS access.
 
+## Screenshot
+
+![Pang DB screenshot](docs/assets/pang-db-screenshot.png)
+
+Pang DB running locally with a successful sandbox-backed connection, the schema explorer on the left, and the read-only SQL runner ready in the main workspace.
+
 ## Features
 
 - connection health and database identity
