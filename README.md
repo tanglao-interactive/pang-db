@@ -1,6 +1,22 @@
 # Pang DB
 
-Pang DB is a simple PostgreSQL explorer for local use with `npx ampx sandbox`. It combines a Next.js App Router client, a Material UI admin surface, and an Amplify Gen 2 Lambda that can be attached to an existing VPC for RDS access.
+Pang DB is a lightweight PostgreSQL workbench for local use with `npx ampx sandbox`. It is built for sandbox sanity checks, connectivity testing, schema inspection, and ad hoc queries against RDS-backed development environments. It is not intended to be a production admin console.
+
+## Intended Use
+
+Pang DB is for:
+
+- validating Amplify Gen 2 sandbox connectivity to RDS
+- checking Secrets Manager, VPC, subnet, and security group wiring
+- browsing schemas and tables during development
+- running lightweight sanity-check SQL
+
+Pang DB is not for:
+
+- production operations
+- multi-user administration
+- audited write workflows
+- long-term hosted deployment
 
 ## Screenshot
 
@@ -84,3 +100,4 @@ DATABASE_URL=postgres://user:password@host:5432/db?sslmode=verify-full&sslrootce
 - If the function name is not available yet, the server falls back to the same shared Knex service locally so the UI can still be exercised during development.
 - Lambda mode should return structured failures with a `stage` of `env`, `secret`, `network`, `ssl`, `auth`, or `query` instead of hanging until the full sandbox timeout when possible.
 - Authentication is intentionally out of scope for this first version.
+- This tool is optimized for sandbox verification and developer troubleshooting, not for production database administration.
