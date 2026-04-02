@@ -55,6 +55,45 @@ npm run sandbox
 npm run dev
 ```
 
+## AWS credentials
+
+Local development uses your standard AWS SDK credential chain. The easiest setup is to configure credentials in `~/.aws/credentials`.
+
+Example:
+
+```ini
+[default]
+aws_access_key_id=YOUR_ACCESS_KEY_ID
+aws_secret_access_key=YOUR_SECRET_ACCESS_KEY
+```
+
+Or use a named profile:
+
+```ini
+[pang-dev]
+aws_access_key_id=YOUR_ACCESS_KEY_ID
+aws_secret_access_key=YOUR_SECRET_ACCESS_KEY
+```
+
+Then start the app with that profile:
+
+```bash
+AWS_PROFILE=pang-dev npm run sandbox
+AWS_PROFILE=pang-dev npm run dev
+```
+
+You can verify local AWS access with:
+
+```bash
+aws sts get-caller-identity
+```
+
+This matters for:
+
+- `npx ampx sandbox` deployments
+- local Next.js when invoking the sandbox Lambda
+- local or Lambda-side access to Secrets Manager during development
+
 ## Environment contract
 
 - `AWS_REGION`
