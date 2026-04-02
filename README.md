@@ -6,7 +6,7 @@ Pang DB is a simple PostgreSQL explorer for local use with `npx ampx sandbox`. I
 
 ![Pang DB screenshot](docs/assets/pang-db-screenshot.png)
 
-Pang DB running locally with a successful sandbox-backed connection, the schema explorer on the left, and the read-only SQL runner ready in the main workspace.
+Caption: Pang DB running locally with a successful sandbox-backed connection, the schema explorer on the left, and the read-only SQL runner ready in the main workspace.
 
 ## Features
 
